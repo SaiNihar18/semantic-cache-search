@@ -1,3 +1,10 @@
+import os
+import torch
+# Disable PyTorch multithreading to drastically reduce RAM on Render 512MB tier
+torch.set_num_threads(1)
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+
 from fastapi import FastAPI
 from pydantic import BaseModel
 

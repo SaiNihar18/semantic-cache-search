@@ -13,7 +13,11 @@ class VectorStore:
         # grows to millions of posts without needing a heavyweight vector database.
         self.index = faiss.read_index("data/embeddings/faiss_index.bin")
 
-        self.df = pd.read_csv("data/processed/newsgroups_clustered.csv")
+        # Read only required columns to save RAM (critical for 512MB free tier limit)
+        self.df = pd.read_csv(
+            "data/processed/newsgroups_clustered.csv", 
+            usecols=["doc_id", "category", "clean_text", "dominant_cluster"]
+        )
 
     def search(self, query_embedding, top_k=5):
 
