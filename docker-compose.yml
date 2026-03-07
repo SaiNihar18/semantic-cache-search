@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  semantic-cache:
+    build: .
+    container_name: semantic-cache-api
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount data directories to avoid recreating/reloading everything
+      - ./data:/app/data
+    restart: unless-stopped
