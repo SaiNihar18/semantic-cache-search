@@ -48,10 +48,10 @@ flowchart TD
     J --> K[Update Cache]
     K --> L[Return Fresh Result]
     
-    style F fill:#d4edda,stroke:#28a745
-    style G fill:#f8d7da,stroke:#dc3545
-    style H fill:#d1ecf1,stroke:#0c5460
-    style L fill:#d1ecf1,stroke:#0c5460
+    style F fill:#d4edda,stroke:#28a745,color:#000
+    style G fill:#f8d7da,stroke:#dc3545,color:#000
+    style H fill:#d1ecf1,stroke:#0c5460,color:#000
+    style L fill:#d1ecf1,stroke:#0c5460,color:#000
 ```
 
 ### How It Works
@@ -397,51 +397,23 @@ Semantic_Cache/
 
 ---
 
-## 🔮 Future Improvements
+## � Future Enhancements
 
-### Scalability
-- [ ] Implement **approximate nearest neighbor** search (FAISS IVF) for 100K+ documents
-- [ ] Add **sharding** to distribute cache across multiple nodes
-- [ ] Support **batch query** processing for higher throughput
-
-### Features
-- [ ] **Hybrid search**: Combine semantic and keyword-based retrieval (BM25 + vectors)
-- [ ] **Query expansion**: Automatically suggest related queries
-- [ ] **Multi-language support**: Extend to non-English documents
-- [ ] **Fine-tuning**: Train domain-specific embedding models on newsgroup text
-
-### Cache Optimization
-- [ ] **TTL (Time-To-Live)**: Auto-expire stale cache entries
-- [ ] **LRU eviction**: Replace least-recently-used entries when cache is full
-- [ ] **Dynamic thresholding**: Adjust similarity threshold based on query confidence
-
-### Monitoring
-- [ ] Add **Prometheus metrics** for observability
-- [ ] Implement **logging** for query patterns and performance
-- [ ] Create **dashboards** to visualize cache efficiency over time
+- **Approximate search** using FAISS IVF for 100K+ document scalability
+- **Hybrid retrieval** combining semantic vectors with BM25 keyword matching
+- **Cache TTL & LRU eviction** for automatic memory management
+- **Multi-language support** with multilingual embedding models
+- **Performance monitoring** via Prometheus metrics and dashboards
 
 ---
 
-## 📝 License
+## 📄 License
 
 This project was built as part of the **Trademarkia AI/ML Engineer Assessment**.
 
 ---
 
-## 👨‍💻 Author
+## 👤 Author
 
 **Sai Nihar**  
 GitHub: [@SaiNihar18](https://github.com/SaiNihar18)
-
----
-
-## 🙏 Acknowledgments
-
-- **20 Newsgroups Dataset**: Classic text classification benchmark
-- **Sentence-Transformers**: Pre-trained semantic embedding models
-- **FAISS**: Meta AI's similarity search library
-- **FastAPI**: Modern Python web framework
-
----
-
-**Built with ❤️ for intelligent information retrieval**
