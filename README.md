@@ -1,133 +1,194 @@
-# Trademarkia AI/ML Engineer Assignment
-### ⚡ High-Performance Semantic Search & Vector Caching System
+# 🚀 Concept-Aware Search Engine & Vector Cache
 
-<div align="left">
-  <img src="https://img.shields.io/badge/FastAPI-005571?style=flat-square&logo=fastapi" alt="FastAPI" />
-  <img src="https://img.shields.io/badge/PyTorch-EE4C2C?style=flat-square&logo=pytorch&logoColor=white" alt="PyTorch" />
-  <img src="https://img.shields.io/badge/scikit_learn-F7931E?style=flat-square&logo=scikit-learn&logoColor=white" alt="Scikit-Learn" />
-  <img src="https://img.shields.io/badge/Docker-2CA5E0?style=flat-square&logo=docker&logoColor=white" alt="Docker" />
-  <img src="https://img.shields.io/badge/Render-000000?style=flat-square&logo=render&logoColor=white" alt="Render" />
-</div>
+**Live API Documentation:** [https://semantic-cache-search.onrender.com/docs](https://semantic-cache-search.onrender.com/docs)
 
-<br>
+An enterprise-grade retrieval system layered over the 20 Newsgroups corpus. Designed to fulfill the **Trademarkia AI/ML Engineer Task**, this application maps natural language to high-dimensional mathematics, clustering and caching queries intelligently to bypass repetitive embedding operations. 
 
-A standalone, completely localized AI API that searches the **20 Newsgroups Dataset** (~20,000 documents) efficiently. By bridging **soft topic clustering**, **L2-normalized FAISS indexing**, and an **in-memory semantic cache**, this system avoids costly redundant embedding loops and delivers sub-millisecond retrieval.
+The entire stack is containerized, memory-optimized for highly restrictive hardware, and deployed from first principles.
 
 ---
 
-### 🌐 Live Deployment
-The engine is containerized and currently running via Render.
-**Test the interactive Swagger UI here:** 
-👉 **[semantic-cache-search.onrender.com/docs](https://semantic-cache-search.onrender.com/docs)**
+## 📑 Contents
+
+- [The Retrieval Challenge](#-the-retrieval-challenge)
+- [System Topology](#-system-topology)
+- [Lifecycle of a Query](#-lifecycle-of-a-query)
+- [In-Memory Semantic Caching](#-in-memory-semantic-caching)
+- [API Specification](#-api-specification)
+- [Deployment & Constraints](#-deployment--constraints)
+- [Project Blueprint](#-project-blueprint)
+- [Local Installation](#-local-installation)
 
 ---
 
-## 🏗️ Architecture & Workflow
+## 🛑 The Retrieval Challenge
 
-The architecture satisfies all Trademarkia guidelines strictly by keeping calculations in-memory, discarding hard Redis/Pinecone dependencies, and allowing documents to span fuzzy semantic domains. 
+Standard text retrieval forces exact lexical overlap. An inquiry about *"vehicle emissions"* naturally misses a document discussing *"car exhaust levels"*. 
+
+Furthermore, processing every incoming user query through a transformer model is computationally expensive. If two users ask the same question in slightly varied ways, a standard system recalculates the vectors and scans the database twice. 
+
+This repository solves both issues by:
+1. Translating text into spatial semantic representations.
+2. Grouping information into probabilistic boundaries.
+3. Establishing an intelligent caching dictionary that understands human paraphrasing.
+
+---
+
+## 🗺️ System Topology
+
+Below is the execution path triggered whenever a payload hits the `/query` endpoint.
 
 ```mermaid
 graph TD
-    %% Core Inputs
-    A[User Submits Text Query via JSON] --> B[all-MiniLM-L6-v2 Encoder]
-    B --> C[384-Dim Vector State]
+    A[Client JSON Request] --> B[all-MiniLM-L6-v2 Model]
+    B --> C[384-Dimension Normalized Vector]
     
-    %% Prediction Routing
-    C --> D(GMM: Fetch Dynamic Concept Cluster ID)
-    D --> E{Topic-Segmented Semantic Cache}
+    C --> D[Scikit-Learn GMM]
+    D --> E(Extract Highest Probability Topic ID)
+    E --> F{Cache Dictionary Lookup}
     
-    %% Cache Logic Branches
-    E -- Cosine Similarity ≥ 0.85 --> F[✅ Cache HIT]
-    F --> G(Bypass DB: Immediate Millisecond Return)
+    F -- Scans ID: Cosine > 0.85 --> G[✅ Vector Match Found]
+    G --> H((Zero-Latency Return))
     
-    E -- Cosine Similarity < 0.85 --> H[❌ Cache MISS]
-    H --> I[FAISS FlatIP Index: Cosine Scan]
-    I --> J(Retrieve Target Source Document)
-    J --> K[Write Sequence to Local RAM Domain]
-    K --> L(Return Processed Data)
-
-    %% Styling
-    classDef hit fill:#e6ffed,stroke:#2ea043,stroke-width:2px,color:#000;
-    classDef miss fill:#ffebe9,stroke:#cf222e,stroke-width:2px,color:#000;
-    class F hit;
-    class H miss;
+    F -- Empty list or Cosine < 0.85 --> I[❌ Cache Miss]
+    I --> J[FAISS L2 Flat Index]
+    J --> K[Retrieve Corpus Document]
+    K --> L[Save Vector & Result to Cache RAM]
+    L --> M((Execution Complete))
 ```
 
 ---
 
-## 🧰 Component Breakdown
+## 🔬 Lifecycle of a Query
 
-| Requirement Stage | Technology Used | Why This Over Alternatives? |
-| :--- | :--- | :--- |
-| **Embeddings** | `sentence-transformers` (`MiniLM-L6`) | BERT-Large is too heavy for API inference. MiniLM maps exact 384-dimensional concepts directly on CPU with 5x speed improvements. |
-| **Vector DB** | `FAISS (IndexFlatIP)` natively | External databases (Pinecone/Qdrant) induce arbitrary network latency. Local exact L2 inner-product search achieves logarithmic mapping. |
-| **Clustering** | `Gaussian Mixture Models (GMM)` | K-Means uses *hard boundaries*; GMM evaluates *soft distributions* (e.g., 80% Religion / 20% Politics), fitting the assignment constraint natively. |
-| **Cache Engine** | Python `defaultdict` + Numpy | Allows zero-latency dictionary isolation. Topics are pre-segmented so a "space" query won't waste calculations checking "politics" cache data. |
+### 1. Vector Mapping
+When a string enters the backend, `sentence-transformers` translates it via the lightweight `MiniLM-L6` architecture. We explicitly chose this model as it yields excellent geometric density without requiring multi-gigabyte GPU environments. Vectors are strictly **L2-normalized** to prepare them for optimized mathematical mapping.
 
----
+### 2. Fast Indexing
+We bypassed bulky external services (like Pinecone) over network requests in favor of a locally compiled **FAISS index**. By configuring `IndexFlatIP`, the dot product against our normalized vectors produces mathematically exact Cosine Similarities in fractional milliseconds across ~20,000 document coordinates.
 
-## 🛠️ Tuning The Caching Threshold
-
-<details>
-<summary><b><i>Click to read the analysis adjusting the 0.85 threshold limit.</i></b></summary>
-
-The most critical parameter of semantic caching is the validation boundary for equivalence. Let's look at the operational behavior of different limits.
-
-* **Threshold: 0.70 (Aggressive / High Hit Rate)**
-  * **Result:** High False-Positive Risk.
-  * **Behavior:** Variations are too broadly accepted. A query for *"Windows 95 graphics"* and a query for *"Windows system crash"* would both hit the same cached response because they share a massive baseline PC vocabulary. 
-* **Threshold: 0.85 (Balanced - Project Default)**
-  * **Result:** Precise Semantic Overlap.
-  * **Behavior:** Firmly separates differing intents while gracefully merging synonyms (e.g. *"How does a space shuttle launch?"* & *"Explain shuttle liftoff mechanisms"*).
-* **Threshold: 0.95 (Conservative / Low Hit Rate)**
-  * **Result:** Keyword Dependency.
-  * **Behavior:** Starts behaving exactly like standard Redis string-matching. Natural human phrasing variations miss entirely, defeating the entire concept of the semantic layer.
-
-</details>
+### 3. Probabilistic Boundaries (Clustering)
+Documents rarely fit neatly into a single box (e.g., an article on tech legislation intersects both *Law* and *Computers*). We strictly avoided standard K-Means hard logic, instead implementing a **Gaussian Mixture Model (GMM)**. The GMM evaluates probability matrices, allowing the system to assign soft boundaries to the underlying newsgroups text.
 
 ---
 
-## 🚨 Extreme Memory Limitations (512MB Server Fixes)
+## 🧠 In-Memory Semantic Caching
 
-Free-tier hostings crash immediately when launching Python ML toolkits. I rebuilt the logic completely to squeeze inside the 512MiB roof:
+### Bypassing Traditional Key-Value Stores
+Standard memory stores evaluate strings on a strictly 1:1 basis. *"Who built the first telephone?"* and *"Inventor of the original phone"* calculate as entirely separate dictionary misses, defeating the purpose of an AI-centric backend. 
 
-- **Bypassed Matrix Computations**: Running `GMM.fit()` on 20,000 document vectors devours RAM over the 512MB limit instantly. This project securely saves and loads pre-computed `gmm_model.pkl` parameters directly to skip overhead.
-- **Destroyed OpenMP Sub-processes**: PyTorch allocates hundreds of megabytes dynamically looking for multiple CPU sockets to split threads across. This image explicitly enforces `torch.set_num_threads(1)` and strips runtime limits to force extreme single-thread stability. 
-- **Trimmed Garbage Collection**: Pandas reads naturally suck up ~30MiB of useless raw strings from datasets. Adjusted DataFrame loaders strictly extract the crucial 4 index vectors, deleting ~60% of idle RAM overhead natively.
-- **Docker Image Layering**: Dynamic HuggingFace model cache unzipping causes memory death upon server spin-up. Appended native build-time executions in the `Dockerfile` to bake the complete vector parameters locally during integration.
+### Mechanism of Action
+To solve lookup latency as the cache grows to millions of entries, our mechanism is structurally localized:
+1. The GMM assigns the incoming request to a specific **Domain ID**.
+2. The cache dictionary isolates the search purely to vectors trapped within that specific ID. (A user asking about Linux will not trigger cache similarity checks against the Religion queries bucket).
+3. If an inner vector clears the tunable confidence threshold, the database is ignored entirely.
+
+### Tuning the Validation Threshold
+
+| Parameter Setup | Operational Behavior |
+| :--- | :--- |
+| **0.70 Boundary** | **Unstable Recall**. Falsely conflates broad vocabulary. Computes *"How to install RAM"* and *"How to install CPUs"* as the same query. |
+| **0.85 Boundary** | **Optimal Baseline**. Strips variations while honoring intent. Equates *"Spaceship launch sequence"* accurately with *"Rocket liftoff protocol"*. |
+| **0.95 Boundary** | **Over-fitted Restriction**. Falls back to keyword equivalence. Excludes completely valid human synonyms, starving the cache hit rate. |
 
 ---
 
-## ⚡ Deployment & Running It Locally
+## 🔌 API Specification
 
-Drop right to compiling via your preference natively or via isolated containers.
+The REST server operates on FastAPI. Open `/docs` on the live server for the Swagger sandbox.
 
-**Docker Ecosystem**
+### `POST /query`
+Performs the core semantic pipeline logic. 
+
+**Payload:**
+```json
+{
+  "query": "Is Windows OS secure from malware?"
+}
+```
+
+**Response:**
+```json
+{
+  "query": "Is Windows OS secure from malware?",
+  "cache_hit": true,
+  "matched_query": "Is Microsoft Windows vulnerable to viruses",
+  "similarity_score": 0.892,
+  "result": "...",
+  "dominant_cluster": 3
+}
+```
+
+### `GET /cache/stats`
+Dumps tracking metrics to monitor active memory reduction.
+```json
+{
+  "total_entries": 105,
+  "hit_count": 42,
+  "miss_count": 63,
+  "hit_rate": 0.400
+}
+```
+
+### `DELETE /cache`
+Safely purges the nested dictionary state maps to simulate a cold boot.
+
+---
+
+## ☁️ Deployment & Constraints
+
+Deploying AI systems onto the typical 512MB RAM free-tier cloud limits results in instant Out-Of-Memory (OOM) fatal kills. I implemented massive system overhauls to stabilize this on **Render**:
+
+1. **Matrix Bypass (`gmm_model.pkl`)**: Calculating the GMM `.fit()` covariance relationships across thousands of geometric points dynamically crashes lightweight hardware. The GMM parameters were mapped locally and dumped into a binary pickle format, entirely avoiding training calculation overhead during cloud boot sequences.
+2. **OpenMP Sub-thread Eradication**: Natively, PyTorch consumes system memory greedily attempting to split background handlers across virtual CPUs. I injected OS-level environment variables alongside `torch.set_num_threads(1)` to lock execution strictly to a single, memory-safe pathway.
+3. **Dataframe Collection**: Instead of pulling 25MB of raw CSV text into live operational memory, the `VectorStore` init sequence explicitly masks irrelevant layout formats, caching solely the four necessary operational columns to radically slash the memory footprint.
+4. **Pre-Cache Docker Instructions**: HuggingFace dynamically streams multi-megabyte weight files directly to RAM at runtime. The appended `Dockerfile` includes static inline executions to write models immediately into the layer build, eliminating runtime network overheads.
+
+---
+
+## 🏗️ Project Blueprint
+
+```text
+Semantic_Cache/
+├── api/
+│   └── main.py                     # FastAPI Routing
+├── data/
+│   ├── embeddings/
+│   │   ├── faiss_index.bin         # Live DB parameters
+│   │   └── gmm_model.pkl           # Pre-calculated distribution nodes
+│   └── processed/
+│       └── newsgroups_clustered.csv
+├── notebooks/                      # Data pipeline algorithms
+│   ├── 01_data_preparation.ipynb
+│   ├── 02_embeddings_vector_db.ipynb
+│   └── 03_fuzzy_clustering.ipynb
+├── src/                            # Core Class logic
+│   ├── clustering.py               
+│   ├── embedding_model.py
+│   ├── semantic_cache.py
+│   └── vector_store.py
+├── Dockerfile                      # Memory-optimized containerization
+├── README.md                       
+└── requirements.txt
+```
+
+---
+
+## ⚙️ Local Installation
+
+You can pull down the exact environment easily:
+
+**Via Docker:**
 ```bash
-docker build -t semantic-cache .
-docker run -p 8000:8000 semantic-cache
+docker build -t cache-engine .
+docker run -p 8000:8000 cache-engine
 ```
 
-**Standard Virtual Environment**
+**Via Native Python:**
 ```bash
 python -m venv .venv
-# Activate: `.\.venv\Scripts\activate` (Windows) | `source .venv/bin/activate` (Mac/Linux)
+# source .venv/bin/activate (Unix) or .venv\Scripts\activate (Windows)
 
 pip install -r requirements.txt
 uvicorn api.main:app --host 0.0.0.0 --port 8000
 ```
-*API is accessible locally at `http://localhost:8000/docs`.*
-
----
-
-## 🔌 Core API Endpoints
-
-1. 🟢 `POST /query` -> Input target: `{"query": "string"}`
-   * Computes the semantic layout of the request. Scans identical clusters natively to evaluate cache bypass, else runs FAISS target calculations.
-2. 🔵 `GET /cache/stats`
-   * Directly read real-time algorithm metrics, listing the specific percentage Hit/Miss rates and total processed index count.
-3. 🔴 `DELETE /cache`
-   * Nullifies cache dictionaries and performs system memory dumps to begin a clean session tracking slate.
-
----
-*Built specifically for Trademarkia AI/ML Engineer Assignment.*
