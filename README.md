@@ -15,7 +15,7 @@ A production-ready semantic search API that intelligently retrieves documents fr
 
 ---
 
-## 🎯 Project Overview
+## 🔍 Project Overview
 
 Traditional keyword search fails when queries use different words to express the same idea. This system solves that problem by:
 
@@ -28,26 +28,25 @@ Traditional keyword search fails when queries use different words to express the
 
 ---
 
-## 🏛️ System Architecture
+## 🏗️ System Architecture
 
 The system follows a multi-stage pipeline designed for both accuracy and speed:
-
 ```mermaid
 flowchart TD
     A[User Query] --> B[SentenceTransformer Encoder]
     B --> C[384-D Vector Embedding]
     C --> D[GMM Cluster Predictor]
     D --> E{Check Semantic Cache}
-    
+
     E -->|Similarity ≥ 0.85| F[✓ Cache HIT]
     E -->|Similarity < 0.85| G[✗ Cache MISS]
-    
+
     F --> H[Return Cached Result]
     G --> I[FAISS Vector Search]
     I --> J[Retrieve Document]
     J --> K[Update Cache]
     K --> L[Return Fresh Result]
-    
+
     style F fill:#d4edda,stroke:#28a745,color:#000
     style G fill:#f8d7da,stroke:#dc3545,color:#000
     style H fill:#d1ecf1,stroke:#0c5460,color:#000
@@ -66,7 +65,7 @@ flowchart TD
 
 ---
 
-## 📊 Dataset
+## 🗃️ Dataset
 
 **20 Newsgroups Dataset**  
 A collection of approximately 20,000 newsgroup documents spanning 20 different topics:
@@ -82,7 +81,7 @@ The dataset was cleaned to remove headers, signatures, and quoted text, leaving 
 
 ---
 
-## 🔧 Key Components
+## ⚙️ Key Components
 
 ### 1. **Embedding Model** (`src/embedding_model.py`)
 - Uses `sentence-transformers/all-MiniLM-L6-v2` for lightweight, fast inference
@@ -127,7 +126,7 @@ The most innovative component. Instead of caching exact string matches, it:
 
 ---
 
-## 🧠 Semantic Cache Design
+## 💡 Semantic Cache Design
 
 ### The Problem
 Traditional caches use exact string matching:
@@ -138,7 +137,6 @@ Both queries mean the same thing, but a standard cache treats them as different.
 
 ### Our Solution
 Compare the **semantic similarity** of query embeddings:
-
 ```python
 similarity = cosine(embed("what is python"), embed("explain python language"))
 # similarity = 0.89 → Cache HIT!
@@ -149,7 +147,7 @@ similarity = cosine(embed("what is python"), embed("explain python language"))
 | Threshold | Behavior | Use Case |
 |-----------|----------|----------|
 | **0.70** | Very loose matching, high hit rate | Acceptable when approximate answers are fine |
-| **0.85** | ⭐ **Recommended** - Balances precision and recall | General production use |
+| **0.85** | ⭐ **Recommended** — Balances precision and recall | General production use |
 | **0.95** | Strict matching, low hit rate | When exact semantic equivalence is critical |
 
 ### Performance Impact
@@ -161,7 +159,7 @@ With a 0.85 threshold on typical usage:
 
 ---
 
-## 🚀 Installation
+## 📦 Installation
 
 ### Prerequisites
 - Python 3.10 or higher
@@ -169,7 +167,6 @@ With a 0.85 threshold on typical usage:
 - pip package manager
 
 ### Local Setup
-
 ```bash
 # Clone the repository
 git clone https://github.com/SaiNihar18/semantic-cache-search.git
@@ -189,7 +186,6 @@ pip install -r requirements.txt
 ```
 
 ### Docker Setup (Recommended)
-
 ```bash
 # Build the image
 docker build -t semantic-cache .
@@ -202,10 +198,9 @@ The Docker image includes all pre-computed models and data, ensuring consistent 
 
 ---
 
-## ▶️ Running the API
+## 🖥️ Running the API
 
 ### Start the Server
-
 ```bash
 uvicorn api.main:app --host 0.0.0.0 --port 8000
 ```
@@ -215,16 +210,15 @@ The API will be available at:
 - **Base URL**: [http://localhost:8000](http://localhost:8000)
 
 ### Health Check
-
 ```bash
 curl http://localhost:8000/docs
 ```
 
 ---
 
-## 📡 API Endpoints
+## 🔌 API Endpoints
 
-### `POST /query` - Semantic Search
+### `POST /query` — Semantic Search
 
 Performs a semantic search with intelligent caching.
 
@@ -254,13 +248,13 @@ Performs a semantic search with intelligent caching.
 | `query` | string | The original user query |
 | `cache_hit` | boolean | Whether result came from cache |
 | `matched_query` | string | The cached query that matched (if cache hit) |
-| `similarity_score` | float | Cosine similarity to matched query (0.0-1.0) |
+| `similarity_score` | float | Cosine similarity to matched query (0.0–1.0) |
 | `result` | string | The retrieved document text |
-| `dominant_cluster` | integer | Predicted topic cluster (0-19) |
+| `dominant_cluster` | integer | Predicted topic cluster (0–19) |
 
 ---
 
-### `GET /cache/stats` - Cache Metrics
+### `GET /cache/stats` — Cache Metrics
 
 Returns real-time cache performance statistics.
 
@@ -276,7 +270,7 @@ Returns real-time cache performance statistics.
 
 ---
 
-### `DELETE /cache` - Clear Cache
+### `DELETE /cache` — Clear Cache
 
 Flushes all cached entries and resets statistics.
 
@@ -289,10 +283,9 @@ Flushes all cached entries and resets statistics.
 
 ---
 
-## 💡 Example API Usage
+## 📝 Example API Usage
 
 ### Using cURL
-
 ```bash
 # First query (cache miss)
 curl -X POST "http://localhost:8000/query" \
@@ -312,7 +305,6 @@ curl -X DELETE "http://localhost:8000/cache"
 ```
 
 ### Using Python
-
 ```python
 import requests
 
@@ -333,7 +325,6 @@ print(f"Hit Rate: {stats['hit_rate']:.1%}")
 ```
 
 ### Using JavaScript (fetch)
-
 ```javascript
 // Search query
 const response = await fetch('http://localhost:8000/query', {
@@ -349,8 +340,7 @@ console.log(`Result: ${data.result}`);
 
 ---
 
-## 📁 Project Structure
-
+## 🗂️ Project Structure
 ```
 Semantic_Cache/
 │
@@ -383,7 +373,7 @@ Semantic_Cache/
 
 ---
 
-## 🛠️ Technologies Used
+## 🔩 Technologies Used
 
 | Category | Technology | Purpose |
 |----------|-----------|---------|
@@ -397,7 +387,7 @@ Semantic_Cache/
 
 ---
 
-## � Future Enhancements
+## 🔭 Future Enhancements
 
 - **Approximate search** using FAISS IVF for 100K+ document scalability
 - **Hybrid retrieval** combining semantic vectors with BM25 keyword matching
@@ -407,13 +397,13 @@ Semantic_Cache/
 
 ---
 
-## 📄 License
+## 📋 License
 
 This project was built as part of the **Trademarkia AI/ML Engineer Assessment**.
 
 ---
 
-## 👤 Author
+## 🧑‍💻 Author
 
 **Sai Nihar**  
 GitHub: [@SaiNihar18](https://github.com/SaiNihar18)
