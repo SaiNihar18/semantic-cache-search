@@ -8,6 +8,9 @@ COPY requirements.txt .
 # Install dependencies (We use --no-cache-dir to keep image size small)
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Pre-download the HuggingFace model during image build so it doesn't spike RAM on Render startup
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
+
 # Copy the rest of the application
 COPY . .
 
