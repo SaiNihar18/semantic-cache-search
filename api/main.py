@@ -5,8 +5,10 @@ torch.set_num_threads(1)
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
 
-from fastapi import FastAPI
-from pydantic import BaseModel
+from typing import Optional
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 
 from src.semantic_cache import SemanticCache
 from src.embedding_model import EmbeddingModel
@@ -15,6 +17,27 @@ from src.clustering import ClusterPredictor
 
 
 app = FastAPI()
+
+origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+env_origins = os.environ.get("ALLOWED_ORIGINS")
+if env_origins:
+    origins.extend([o.strip() for o in env_origins.split(",") if o.strip()])
+
+# Enable CORS so the frontend can reach this API
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 cache = SemanticCache()
 
@@ -28,6 +51,12 @@ cluster_model = ClusterPredictor()
 class QueryRequest(BaseModel):
 
     query: str
+    similarity_threshold: Optional[float] = Field(
+        default=None,
+        ge=0.70,
+        le=0.98,
+        description="Override the default 0.85 cache similarity threshold for this query"
+    )
 
 
 hit_count = 0
@@ -45,7 +74,7 @@ def query_api(request: QueryRequest):
 
     cluster_id = int(cluster_model.predict_cluster(query_embedding))
 
-    cache_result = cache.lookup(query_embedding, cluster_id)
+    cache_result = cache.lookup(query_embedding, cluster_id, threshold=request.similarity_threshold)
 
     if cache_result["cache_hit"]:
 
@@ -57,6 +86,7 @@ def query_api(request: QueryRequest):
             "matched_query": cache_result.get("matched_query"),
             "similarity_score": cache_result.get("similarity_score"),
             "result": cache_result.get("result"),
+            "results": cache_result.get("results"),
             "dominant_cluster": cluster_id
         }
 
@@ -64,7 +94,17 @@ def query_api(request: QueryRequest):
 
     result_text = str(search_results[0]["text"][:500])
 
-    cache.add_to_cache(query, query_embedding, result_text, cluster_id)
+    results_list = []
+    for doc in search_results:
+        results_list.append({
+            "doc_id": int(doc["doc_id"]),
+            "category": str(doc["category"]),
+            "text": str(doc["text"][:500]),
+            "similarity_score": float(doc["similarity_score"]),
+            "dominant_cluster": int(doc["dominant_cluster"])
+        })
+
+    cache.add_to_cache(query, query_embedding, result_text, results_list, cluster_id)
 
     miss_count += 1
 
@@ -74,6 +114,7 @@ def query_api(request: QueryRequest):
         "matched_query": None,
         "similarity_score": None,
         "result": result_text,
+        "results": results_list,
         "dominant_cluster": cluster_id
     }
 
@@ -104,3 +145,22 @@ def clear_cache():
     miss_count = 0
 
     return {"message": "cache cleared"}
+
+
+@app.get("/document/{doc_id}")
+def get_document(doc_id: int):
+    """Retrieve the full text of a single document by its doc_id."""
+
+    matches = vector_store.df[vector_store.df["doc_id"] == doc_id]
+
+    if matches.empty:
+        raise HTTPException(status_code=404, detail=f"Document {doc_id} not found")
+
+    doc = matches.iloc[0]
+
+    return {
+        "doc_id": int(doc["doc_id"]),
+        "category": str(doc["category"]),
+        "clean_text": str(doc["clean_text"]),
+        "dominant_cluster": int(doc["dominant_cluster"])
+    }

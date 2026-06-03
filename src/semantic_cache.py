@@ -18,7 +18,10 @@ class SemanticCache:
         self.similarity_threshold = similarity_threshold
 
 
-    def lookup(self, query_embedding, cluster_id):
+    def lookup(self, query_embedding, cluster_id, threshold=None):
+
+        # Allow per-query threshold override from the API; fall back to the default
+        effective_threshold = threshold if threshold is not None else self.similarity_threshold
 
         candidates = self.cache.get(cluster_id, [])
 
@@ -33,20 +36,21 @@ class SemanticCache:
                 best_score = score
                 best_match = entry
 
-        if best_score >= self.similarity_threshold:
+        if best_score >= effective_threshold:
 
             return {
                 "cache_hit": True,
                 "matched_query": best_match["query"],
                 "similarity_score": float(best_score),
-                "result": best_match["result"],
+                "result": best_match.get("result"),
+                "results": best_match.get("results", []),
                 "dominant_cluster": int(cluster_id)
             }
 
         return {"cache_hit": False}
 
 
-    def add_to_cache(self, query, query_embedding, result, cluster_id):
+    def add_to_cache(self, query, query_embedding, result, results, cluster_id):
 
         for entry in self.cache.get(cluster_id, []):
             if entry["query"] == query:
@@ -55,7 +59,8 @@ class SemanticCache:
         entry = {
             "query": query,
             "embedding": query_embedding,
-            "result": result
+            "result": result,
+            "results": results
         }
 
         self.cache[cluster_id].append(entry)
