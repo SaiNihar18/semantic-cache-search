@@ -25,6 +25,7 @@ origins = [
     "http://127.0.0.1:8080",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "https://semantic-cache-search.vercel.app",
 ]
 env_origins = os.environ.get("ALLOWED_ORIGINS")
 if env_origins:
