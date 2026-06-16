@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, useCallback, type KeyboardEvent } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -16,6 +16,14 @@ import {
   Sparkles,
   RefreshCw,
   Download,
+  Github,
+  BookOpen,
+  Layers,
+  Cpu,
+  Zap,
+  Info,
+  ChevronRight,
+  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
@@ -70,6 +78,13 @@ type SavedState = {
   responseTimeMs: number | null;
 };
 
+type CacheOp = {
+  timestamp: string;
+  query: string;
+  action: "HIT" | "MISS";
+  durationMs: number;
+};
+
 function categoryTint(category: string) {
   if (category.startsWith("sci."))
     return "bg-[rgba(62,207,142,0.12)] text-[#3ECF8E] border-[rgba(62,207,142,0.3)]";
@@ -77,8 +92,63 @@ function categoryTint(category: string) {
     return "bg-[rgba(168,120,255,0.12)] text-[#B795FF] border-[rgba(168,120,255,0.3)]";
   if (category.startsWith("rec."))
     return "bg-[rgba(244,189,80,0.12)] text-[#F4BD50] border-[rgba(244,189,80,0.3)]";
+  if (category.startsWith("talk."))
+    return "bg-[rgba(248,81,73,0.12)] text-[#f85149] border-[rgba(248,81,73,0.3)]";
   return "bg-[rgba(200,200,200,0.08)] text-[#A8A8A8] border-[rgba(200,200,200,0.2)]";
 }
+
+const NEWSGROUP_CATEGORIES = [
+  {
+    group: "Science",
+    color: "#3ECF8E",
+    items: [
+      { name: "sci.space", desc: "Space exploration, astronomy, NASA" },
+      { name: "sci.med", desc: "Medicine, health, diseases" },
+      { name: "sci.electronics", desc: "Electronics, circuits, hardware" },
+      { name: "sci.crypt", desc: "Cryptography, encryption, security" },
+    ],
+  },
+  {
+    group: "Computing",
+    color: "#B795FF",
+    items: [
+      { name: "comp.graphics", desc: "Computer graphics & visualization" },
+      { name: "comp.os.ms-windows.misc", desc: "Windows OS discussions" },
+      { name: "comp.sys.ibm.pc.hardware", desc: "PC hardware & peripherals" },
+      { name: "comp.sys.mac.hardware", desc: "Apple Mac hardware" },
+      { name: "comp.windows.x", desc: "X Window System" },
+    ],
+  },
+  {
+    group: "Recreation",
+    color: "#F4BD50",
+    items: [
+      { name: "rec.autos", desc: "Automobiles & motorsport" },
+      { name: "rec.motorcycles", desc: "Motorcycles & biking" },
+      { name: "rec.sport.baseball", desc: "Baseball & MLB" },
+      { name: "rec.sport.hockey", desc: "Hockey & NHL" },
+    ],
+  },
+  {
+    group: "Talk / Politics",
+    color: "#f85149",
+    items: [
+      { name: "talk.politics.misc", desc: "General political discussion" },
+      { name: "talk.politics.guns", desc: "Gun rights & control" },
+      { name: "talk.politics.mideast", desc: "Middle East politics" },
+      { name: "talk.religion.misc", desc: "Religion & belief discussion" },
+    ],
+  },
+  {
+    group: "Miscellaneous",
+    color: "#A8A8A8",
+    items: [
+      { name: "alt.atheism", desc: "Atheism & secular humanism" },
+      { name: "soc.religion.christian", desc: "Christianity & church" },
+      { name: "misc.forsale", desc: "Buy & sell postings" },
+    ],
+  },
+];
 
 export const Route = createFileRoute("/")(
   {
@@ -105,25 +175,38 @@ function Index() {
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<CacheStats | null>(null);
   const [inputError, setInputError] = useState(false);
+  const [cacheOps, setCacheOps] = useState<CacheOp[]>([]);
 
   const [article, setArticle] = useState<FullDoc | null>(null);
   const [articleLoading, setArticleLoading] = useState(false);
   const [articleSimilarity, setArticleSimilarity] = useState<number | null>(null);
   const savedRef = useRef<SavedState | null>(null);
 
-  // Active nav tab for top navbar
+  // Active nav tab
   const [activeNav, setActiveNav] = useState("Explorer");
+  const telemetryRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     refreshStats();
   }, []);
 
-  async function refreshStats() {
+  const refreshStats = useCallback(async () => {
     try {
       const r = await fetch(`${API}/cache/stats`);
       if (r.ok) setStats(await r.json());
     } catch {
       /* ignore */
+    }
+  }, []);
+
+  function handleNavClick(tab: string) {
+    setActiveNav(tab);
+    if (tab === "Metrics") {
+      // Switch back to explorer view and scroll to telemetry
+      setActiveNav("Explorer");
+      setTimeout(() => {
+        telemetryRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 50);
     }
   }
 
@@ -146,9 +229,18 @@ function Index() {
       });
       if (!r.ok) throw new Error("bad");
       const data: QueryResponse = await r.json();
+      const elapsed = Math.round(performance.now() - start);
       setResponse(data);
-      setResponseTimeMs(Math.round(performance.now() - start));
+      setResponseTimeMs(elapsed);
       refreshStats();
+      // Record this operation in the live cache ops table
+      const op: CacheOp = {
+        timestamp: new Date().toISOString().slice(11, 23) + "Z",
+        query: trimmed.length > 28 ? trimmed.slice(0, 28) + "…" : trimmed,
+        action: data.cache_hit ? "HIT" : "MISS",
+        durationMs: elapsed,
+      };
+      setCacheOps((prev) => [op, ...prev].slice(0, 10));
     } catch {
       setError(
         "Failed to reach the search API. Make sure the backend is running on localhost:8000.",
@@ -219,6 +311,7 @@ function Index() {
       const r = await fetch(`${API}/cache`, { method: "DELETE" });
       if (!r.ok) throw new Error();
       toast.success("Cache cleared");
+      setCacheOps([]);
       refreshStats();
     } catch {
       toast.error("Failed to clear cache");
@@ -239,33 +332,58 @@ function Index() {
       />
       <Toaster theme="dark" />
 
-      {/* ═══════ TOP NAVBAR (matches reference card: image.png / image (5).png) ═══════ */}
-      <nav className="border-b border-white/[0.06] bg-[rgba(13,17,23,0.85)] backdrop-blur-lg">
+      {/* ═══════ TOP NAVBAR ═══════ */}
+      <nav className="border-b border-white/[0.06] bg-[rgba(13,17,23,0.85)] backdrop-blur-lg sticky top-0 z-50">
         <div className="mx-auto flex h-14 max-w-[1200px] items-center justify-between px-5">
           <div className="flex items-center gap-6">
-            <span className="text-base font-bold text-[#3ECF8E]">SemanticCache</span>
-            {["Explorer", "Metrics", "Integrations", "Settings"].map((t) => (
+            <button
+              onClick={() => { setActiveNav("Explorer"); setArticle(null); }}
+              className="text-base font-bold text-[#3ECF8E] hover:opacity-80 transition"
+            >
+              SemanticCache
+            </button>
+            {(["Explorer", "Metrics", "About Data"] as const).map((t) => (
               <button
                 key={t}
-                onClick={() => setActiveNav(t)}
-                className={`hidden text-sm transition md:inline-block ${activeNav === t ? "nav-link-active font-medium" : "text-[#7d8590] hover:text-foreground"}`}
+                onClick={() => handleNavClick(t)}
+                className={`hidden text-sm transition md:inline-flex items-center gap-1.5 ${
+                  activeNav === t
+                    ? "nav-link-active font-medium text-foreground"
+                    : "text-[#7d8590] hover:text-foreground"
+                }`}
               >
+                {t === "About Data" && <Info className="h-3.5 w-3.5" />}
                 {t}
               </button>
             ))}
           </div>
           <div className="flex items-center gap-3">
-            <span className="hidden text-sm text-[#7d8590] md:inline">Docs</span>
-            <button className="rounded-lg border border-[#3ECF8E] bg-transparent px-3.5 py-1.5 text-sm font-semibold text-[#3ECF8E] transition hover:bg-[rgba(62,207,142,0.08)]">
-              Deploy Node
-            </button>
+            <a
+              href="http://localhost:8000/docs"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden text-sm text-[#7d8590] hover:text-foreground transition md:inline-flex items-center gap-1"
+            >
+              API Docs <ExternalLink className="h-3 w-3" />
+            </a>
+            <a
+              href="https://github.com/SaiNihar18/semantic-cache-search"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="grid h-8 w-8 place-items-center rounded-lg border border-[#30363d] bg-white/[0.03] text-[#7d8590] transition hover:border-white/20 hover:text-foreground"
+              aria-label="GitHub repository"
+            >
+              <Github className="h-4 w-4" />
+            </a>
           </div>
         </div>
       </nav>
 
       <div className="mx-auto w-full max-w-[960px] px-5 py-10 md:py-14">
         <AnimatePresence mode="wait">
-          {article ? (
+          {activeNav === "About Data" ? (
+            <AboutData key="about" />
+          ) : article ? (
             <ArticleView
               key="article"
               article={article}
@@ -284,17 +402,17 @@ function Index() {
               <header className="mx-auto mb-10 max-w-[800px] text-center">
                 <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-mono text-muted-foreground">
                   <Sparkles className="h-3.5 w-3.5 text-[#3ECF8E]" />
-                  SemanticCache · v2.4.1
+                  SemanticCache · 20 Newsgroups · ~20K Docs
                 </div>
                 <h1 className="text-4xl font-bold leading-[1.1] tracking-tight md:text-6xl">
                   <span className="text-gradient-brand">Semantic Cache Search</span>
                 </h1>
                 <p className="mx-auto mt-4 max-w-[640px] text-base text-muted-foreground md:text-lg">
-                  Fast, cluster-aware document retrieval with intelligent caching across 20,000 documents.
+                  Fast, cluster-aware document retrieval with intelligent caching across 20,000 newsgroup documents.
                 </p>
               </header>
 
-              {/* ═══════ SEARCH CONSOLE (matches: image (3).png) ═══════ */}
+              {/* ═══════ SEARCH CONSOLE ═══════ */}
               <section className="glass-strong mb-8 rounded-2xl p-5 md:p-7">
                 {/* title bar */}
                 <div className="mb-5 flex items-center gap-2.5">
@@ -368,6 +486,7 @@ function Index() {
                   />
                   <div className="mt-2 flex justify-between font-mono text-[11px] text-[#7d8590]">
                     <span>0.70 (Broad)</span>
+                    <span>0.85 ★ Recommended</span>
                     <span>0.98 (Exact)</span>
                   </div>
                 </div>
@@ -398,24 +517,289 @@ function Index() {
                 </AnimatePresence>
               </section>
 
-              {/* ═══════ TELEMETRY (matches: image.png) ═══════ */}
-              <Telemetry stats={stats} onClear={clearCache} />
+              {/* ═══════ TELEMETRY ═══════ */}
+              <section ref={telemetryRef}>
+                <Telemetry stats={stats} onClear={clearCache} onRefresh={refreshStats} cacheOps={cacheOps} />
+              </section>
 
               {/* ═══════ FOOTER ═══════ */}
-              <footer className="mt-10 flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-5 font-mono text-[11px] text-[#7d8590]">
-                <span>&copy; 2024 SemanticCache Inc. Protocol v2.4.1</span>
-                <div className="flex gap-4">
-                  <span className="cursor-pointer hover:text-foreground">Privacy</span>
-                  <span className="cursor-pointer hover:text-foreground">Terms</span>
-                  <span className="cursor-pointer hover:text-foreground">System Status</span>
-                  <span className="cursor-pointer hover:text-foreground">Changelog</span>
-                </div>
-              </footer>
+              <Footer />
             </motion.div>
           )}
         </AnimatePresence>
       </div>
     </div>
+  );
+}
+
+/* ────────────────────────────────────────────── */
+/*  FOOTER                                         */
+/* ────────────────────────────────────────────── */
+function Footer() {
+  const year = new Date().getFullYear();
+  return (
+    <footer className="mt-10 border-t border-white/5 pt-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-[#3ECF8E] text-sm">SemanticCache</span>
+            <span className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-[#7d8590]">
+              v2.4.1
+            </span>
+          </div>
+          <p className="font-mono text-[11px] text-[#7d8590]">
+            © {year} Built by{" "}
+            <a
+              href="https://github.com/SaiNihar18"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-foreground/70 hover:text-[#3ECF8E] transition"
+            >
+              Sai Nihar
+            </a>{" "}
+            · 20 Newsgroups · FAISS + SentenceTransformers
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-4 font-mono text-[11px] text-[#7d8590]">
+          <a
+            href="https://github.com/SaiNihar18/semantic-cache-search"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 hover:text-foreground transition"
+          >
+            <Github className="h-3 w-3" /> GitHub
+          </a>
+          <a
+            href="http://localhost:8000/docs"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 hover:text-foreground transition"
+          >
+            <ExternalLink className="h-3 w-3" /> API Docs
+          </a>
+          <a
+            href="https://scikit-learn.org/stable/datasets/real_world.html#the-20-newsgroups-text-dataset"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 hover:text-foreground transition"
+          >
+            <Database className="h-3 w-3" /> Dataset
+          </a>
+          <span className="inline-flex items-center gap-1">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#3ECF8E] shadow-[0_0_6px_#3ECF8E]" />
+            Backend live
+          </span>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+/* ────────────────────────────────────────────── */
+/*  ABOUT DATA                                     */
+/* ────────────────────────────────────────────── */
+function AboutData() {
+  return (
+    <motion.div
+      key="about"
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.3 }}
+      className="space-y-8"
+    >
+      {/* Header */}
+      <div>
+        <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-mono text-muted-foreground">
+          <BookOpen className="h-3.5 w-3.5 text-[#3ECF8E]" />
+          Dataset & Architecture Reference
+        </div>
+        <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
+          About the <span className="text-gradient-brand">Data & System</span>
+        </h1>
+        <p className="mt-3 max-w-[640px] text-muted-foreground">
+          This search engine indexes the{" "}
+          <a
+            href="https://scikit-learn.org/stable/datasets/real_world.html#the-20-newsgroups-text-dataset"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[#3ECF8E] hover:underline inline-flex items-center gap-0.5"
+          >
+            20 Newsgroups dataset <ExternalLink className="h-3 w-3" />
+          </a>
+          — a classic NLP benchmark containing ~20,000 newsgroup posts across 20 topic categories from the early 1990s.
+        </p>
+      </div>
+
+      {/* Stats row */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[
+          { label: "Total Documents", value: "~20,000", icon: <Database className="h-4 w-4" />, color: "#3ECF8E" },
+          { label: "Topic Categories", value: "20", icon: <Layers className="h-4 w-4" />, color: "#B795FF" },
+          { label: "Embedding Dims", value: "384", icon: <Cpu className="h-4 w-4" />, color: "#F4BD50" },
+          { label: "GMM Clusters", value: "20", icon: <Zap className="h-4 w-4" />, color: "#f85149" },
+        ].map((s) => (
+          <div key={s.label} className="glass rounded-xl p-4">
+            <div className="mb-1 flex items-center gap-2 text-sm text-[#7d8590]">
+              <span style={{ color: s.color }}>{s.icon}</span>
+              {s.label}
+            </div>
+            <div className="text-2xl font-bold tracking-tight" style={{ color: s.color }}>
+              {s.value}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Categories breakdown */}
+      <div className="glass-strong rounded-2xl p-6">
+        <h2 className="mb-1 text-lg font-bold">Category Breakdown</h2>
+        <p className="mb-6 text-sm text-[#7d8590]">
+          All 20 newsgroup topics indexed in this system, grouped by subject area.
+        </p>
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {NEWSGROUP_CATEGORIES.map((group) => (
+            <div key={group.group}>
+              <div
+                className="mb-2.5 flex items-center gap-2 text-sm font-semibold"
+                style={{ color: group.color }}
+              >
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{ background: group.color, boxShadow: `0 0 6px ${group.color}` }}
+                />
+                {group.group}
+              </div>
+              <div className="space-y-1.5">
+                {group.items.map((item) => (
+                  <div
+                    key={item.name}
+                    className="rounded-lg border border-[#30363d] bg-[#0d1117]/50 px-3 py-2"
+                  >
+                    <div className="font-mono text-[12px] font-semibold text-foreground/90">
+                      {item.name}
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-[#7d8590]">{item.desc}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* How it works pipeline */}
+      <div className="glass-strong rounded-2xl p-6">
+        <h2 className="mb-1 text-lg font-bold">How the Search Pipeline Works</h2>
+        <p className="mb-6 text-sm text-[#7d8590]">
+          Every query goes through a 4-stage process designed for speed and accuracy.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            {
+              step: "1",
+              title: "Encode",
+              color: "#3ECF8E",
+              icon: <Cpu className="h-5 w-5" />,
+              desc: "Your query is encoded into a 384-dimensional vector using the all-MiniLM-L6-v2 transformer model.",
+            },
+            {
+              step: "2",
+              title: "Cluster",
+              color: "#B795FF",
+              icon: <Layers className="h-5 w-5" />,
+              desc: "A Gaussian Mixture Model predicts which topic cluster(s) the query belongs to (soft assignment).",
+            },
+            {
+              step: "3",
+              title: "Cache Lookup",
+              color: "#F4BD50",
+              icon: <Zap className="h-5 w-5" />,
+              desc: "The cache is searched within the predicted cluster. If cosine similarity ≥ threshold → Cache HIT.",
+            },
+            {
+              step: "4",
+              title: "FAISS Search",
+              color: "#f85149",
+              icon: <Search className="h-5 w-5" />,
+              desc: "On a cache miss, FAISS performs exact inner-product search over all ~20K document embeddings.",
+            },
+          ].map((s, i) => (
+            <div key={s.step} className="relative rounded-xl border border-[#30363d] bg-[#0d1117]/50 p-4">
+              {i < 3 && (
+                <ChevronRight
+                  className="absolute -right-3 top-1/2 z-10 hidden h-4 w-4 -translate-y-1/2 text-[#30363d] lg:block"
+                />
+              )}
+              <div
+                className="mb-3 inline-grid h-9 w-9 place-items-center rounded-lg"
+                style={{ background: `${s.color}18`, color: s.color }}
+              >
+                {s.icon}
+              </div>
+              <div className="mb-1 font-mono text-[10px] uppercase tracking-widest" style={{ color: s.color }}>
+                Step {s.step}
+              </div>
+              <div className="mb-2 font-bold">{s.title}</div>
+              <p className="text-[12px] leading-relaxed text-[#7d8590]">{s.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Model info + threshold guide */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="glass-strong rounded-2xl p-6">
+          <h2 className="mb-4 text-lg font-bold flex items-center gap-2">
+            <Cpu className="h-5 w-5 text-[#3ECF8E]" /> Model & Index
+          </h2>
+          <div className="space-y-3">
+            {[
+              { label: "Embedding Model", value: "all-MiniLM-L6-v2", sub: "22M parameters · Fast CPU inference" },
+              { label: "Vector Index", value: "FAISS IndexFlatIP", sub: "Exact inner-product search" },
+              { label: "Clustering", value: "Gaussian Mixture Model", sub: "20 components · Soft assignment" },
+              { label: "Normalization", value: "L2 Normalized", sub: "Cosine similarity via inner product" },
+            ].map((row) => (
+              <div key={row.label} className="rounded-lg border border-[#30363d] bg-[#0d1117]/50 p-3">
+                <div className="mb-0.5 text-[11px] uppercase tracking-widest text-[#7d8590]">{row.label}</div>
+                <div className="font-mono text-sm font-semibold text-[#3ECF8E]">{row.value}</div>
+                <div className="text-[11px] text-[#7d8590]">{row.sub}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="glass-strong rounded-2xl p-6">
+          <h2 className="mb-4 text-lg font-bold flex items-center gap-2">
+            <SlidersHorizontal className="h-5 w-5 text-[#B795FF]" /> Threshold Guide
+          </h2>
+          <p className="mb-4 text-sm text-[#7d8590]">
+            The similarity threshold controls how strictly a cached result must match your new query before being served from cache.
+          </p>
+          <div className="space-y-3">
+            {[
+              { val: "0.70", label: "Broad", color: "#F4BD50", desc: "High cache hit rate. Good when approximate answers are acceptable." },
+              { val: "0.85", label: "★ Recommended", color: "#3ECF8E", desc: "Balanced precision & recall. Best for general production use." },
+              { val: "0.95 – 0.98", label: "Exact", color: "#f85149", desc: "Strict matching. Low hit rate. Use when exact semantic equivalence is critical." },
+            ].map((t) => (
+              <div
+                key={t.val}
+                className="rounded-lg border p-3"
+                style={{ borderColor: `${t.color}33`, background: `${t.color}0a` }}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-mono text-sm font-bold" style={{ color: t.color }}>{t.val}</span>
+                  <span className="text-xs font-semibold" style={{ color: t.color }}>{t.label}</span>
+                </div>
+                <p className="text-[12px] text-[#7d8590]">{t.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <Footer />
+    </motion.div>
   );
 }
 
@@ -433,7 +817,8 @@ function EmptyState() {
       <div className="grid h-14 w-14 place-items-center rounded-full border border-[#30363d] bg-white/[0.03]">
         <Search className="h-6 w-6" />
       </div>
-      <p className="text-sm">Enter a query to search</p>
+      <p className="text-sm">Enter a query to search across 20,000 newsgroup documents</p>
+      <p className="text-xs text-[#484f58]">Try: "Space & Rockets", "Computer Hardware", or "Medicine"</p>
     </motion.div>
   );
 }
@@ -508,10 +893,17 @@ function ResultsView({
                 <Folder className="h-3 w-3" />
                 {r.category}
               </span>
-              <span className="shrink-0 font-mono text-sm text-[#7d8590]">
+              <span className="shrink-0 font-mono text-sm text-[#7d8590] flex items-center gap-1">
                 Score{" "}
                 <span className="font-bold text-[#3ECF8E]">
                   {r.similarity_score.toFixed(2)}
+                </span>
+                <span className="group/tooltip relative">
+                  <Info className="h-3.5 w-3.5 text-[#7d8590] hover:text-foreground cursor-help" />
+                  <span className="pointer-events-none absolute right-0 bottom-full mb-2 w-64 rounded-lg border border-[#30363d] bg-[#0d1117] p-2.5 text-xs font-sans leading-relaxed text-[#7d8590] opacity-0 shadow-2xl transition-opacity group-hover/tooltip:opacity-100 z-30 normal-case font-normal">
+                    <strong className="text-foreground block mb-1">Document Similarity Score</strong>
+                    Calculated using cosine similarity. Short query vectors matched against long document vectors naturally yield scores of 0.45–0.70 due to length and context dilution.
+                  </span>
                 </span>
               </span>
             </div>
@@ -552,8 +944,7 @@ function ResultsView({
 }
 
 /* ────────────────────────────────────────────── */
-/*  CACHE BANNER (matches: image (1).png HIT,      */
-/*  image (4).png MISS)                            */
+/*  CACHE BANNER                                   */
 /* ────────────────────────────────────────────── */
 function CacheBanner({
   response,
@@ -612,7 +1003,7 @@ function CacheBanner({
               )}
             </div>
           ) : (
-            <span className="text-sm text-[#7d8590]">Performing vector search...</span>
+            <span className="text-sm text-[#7d8590]">Performing vector search across 20K documents…</span>
           )}
         </div>
 
@@ -625,14 +1016,19 @@ function CacheBanner({
           }`}
         >
           {hit ? (
-            <>
+            <span className="group/cache-tooltip relative flex items-center gap-1">
               Similarity{" "}
               <span className="ml-1">{(response.similarity_score ?? 0).toFixed(2)}</span>
-            </>
+              <Info className="h-3.5 w-3.5 text-[#3ECF8E]/80 hover:text-[#3ECF8E] cursor-help" />
+              <span className="pointer-events-none absolute right-0 bottom-full mb-2 w-64 rounded-lg border border-[#3ECF8E]/30 bg-[#0d1117] p-2.5 text-xs font-sans leading-relaxed text-[#7d8590] opacity-0 shadow-2xl transition-opacity group-hover/cache-tooltip:opacity-100 z-30 normal-case font-normal">
+                <strong className="text-foreground block mb-1">Query-to-Query Similarity</strong>
+                Cosine similarity between this search and a previous search. Because both are short queries, exact or close semantic matches naturally score high (&ge; 0.85).
+              </span>
+            </span>
           ) : (
             <span className="inline-flex items-center gap-1">
               <Timer className="h-3 w-3" />
-              {responseTimeMs ?? 185}ms
+              {responseTimeMs ?? "—"}ms
             </span>
           )}
         </div>
@@ -642,7 +1038,7 @@ function CacheBanner({
 }
 
 /* ────────────────────────────────────────────── */
-/*  ARTICLE VIEW (matches: image (5).png)          */
+/*  ARTICLE VIEW                                   */
 /* ────────────────────────────────────────────── */
 function ArticleView({
   article,
@@ -655,6 +1051,24 @@ function ArticleView({
   onBack: () => void;
   similarity: number | null;
 }) {
+  function handleExport() {
+    const payload = {
+      doc_id: article.doc_id,
+      category: article.category,
+      dominant_cluster: article.dominant_cluster,
+      similarity_score: similarity,
+      clean_text: article.clean_text,
+      exported_at: new Date().toISOString(),
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `document_${article.doc_id}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 40 }}
@@ -715,7 +1129,7 @@ function ArticleView({
           )}
         </div>
 
-        {/* ── sidebar metadata (matches right column in image (5).png) ── */}
+        {/* sidebar metadata */}
         <aside className="space-y-4 lg:border-l lg:border-white/[0.06] lg:pl-6">
           <div className="flex items-center gap-2 text-sm">
             <BarChart3 className="h-4 w-4 text-[#3ECF8E]" />
@@ -735,7 +1149,7 @@ function ArticleView({
             </div>
             <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/5">
               <div
-                className="h-full rounded-full bg-[#3ECF8E]"
+                className="h-full rounded-full bg-[#3ECF8E] transition-all duration-700"
                 style={{ width: `${Math.min(100, (similarity ?? 0) * 100)}%` }}
               />
             </div>
@@ -762,12 +1176,16 @@ function ArticleView({
               Cluster {article.dominant_cluster}
             </div>
             <div className="mt-1.5 font-mono text-[11px] text-[#7d8590]">
-              Centroid Dist: 0.12
+              GMM Soft Assignment
             </div>
           </div>
 
-          {/* export button */}
-          <button className="flex w-full items-center justify-center gap-2 rounded-lg border border-[#30363d] bg-[#161b22] py-2.5 text-sm font-medium text-foreground/85 transition hover:border-white/20 hover:bg-[#1c2128]">
+          {/* export button — now functional */}
+          <button
+            onClick={handleExport}
+            disabled={loading}
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-[#30363d] bg-[#161b22] py-2.5 text-sm font-medium text-foreground/85 transition hover:border-[#3ECF8E]/40 hover:bg-[rgba(62,207,142,0.06)] hover:text-[#3ECF8E] disabled:opacity-50"
+          >
             <Download className="h-4 w-4" />
             Export JSON
           </button>
@@ -801,14 +1219,18 @@ function useCountUp(value: number, duration = 600) {
 }
 
 /* ────────────────────────────────────────────── */
-/*  TELEMETRY (matches: image.png)                 */
+/*  TELEMETRY                                      */
 /* ────────────────────────────────────────────── */
 function Telemetry({
   stats,
   onClear,
+  onRefresh,
+  cacheOps,
 }: {
   stats: CacheStats | null;
   onClear: () => void;
+  onRefresh: () => void;
+  cacheOps: CacheOp[];
 }) {
   const hitRate = useCountUp(stats ? stats.hit_rate * 100 : 0);
   const entries = useCountUp(stats?.total_entries ?? 0);
@@ -829,14 +1251,13 @@ function Telemetry({
         <div>
           <h2 className="text-xl font-bold tracking-tight">Telemetry Overview</h2>
           <p className="text-xs text-[#7d8590]">
-            Real-time metrics for Edge_Cluster_01 cache performance.
+            Real-time cache performance metrics for this session.
           </p>
         </div>
         <button
           className="text-[#7d8590] transition hover:text-foreground"
-          onClick={() => {
-            /* would refresh */
-          }}
+          onClick={onRefresh}
+          title="Refresh stats"
         >
           <RefreshCw className="h-4 w-4" />
         </button>
@@ -892,7 +1313,6 @@ function Telemetry({
             <span className="text-3xl font-bold tracking-tight">
               {Math.round(entries)}
             </span>
-            <span className="text-lg text-[#7d8590]">k</span>
           </div>
           <div className="mt-3 text-xs text-[#7d8590]">Total active items stored</div>
         </div>
@@ -927,56 +1347,53 @@ function Telemetry({
         </button>
       </div>
 
-      {/* ── Recent Cache Operations table (matches: image.png) ── */}
+      {/* ── Live Cache Operations Table ── */}
       <div className="glass mt-4 rounded-xl p-5">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-base font-semibold">Recent Cache Operations</h3>
-          <RefreshCw className="h-4 w-4 text-[#7d8590]" />
+          <span className="font-mono text-[11px] text-[#7d8590]">
+            {cacheOps.length === 0 ? "No queries yet this session" : `${cacheOps.length} operation${cacheOps.length !== 1 ? "s" : ""}`}
+          </span>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-white/[0.06] text-left text-xs text-[#7d8590]">
-                <th className="pb-3 font-medium">Timestamp</th>
-                <th className="pb-3 font-medium">Key Prefix</th>
-                <th className="pb-3 font-medium">Action</th>
-                <th className="pb-3 font-medium">Duration</th>
-              </tr>
-            </thead>
-            <tbody className="font-mono text-xs">
-              <tr className="border-b border-white/[0.03]">
-                <td className="py-3 text-[#7d8590]">10:42:01.002Z</td>
-                <td className="py-3 text-[#3ECF8E]">user:profile:*</td>
-                <td className="py-3">
-                  <span className="rounded border border-[#3ECF8E]/30 bg-[rgba(62,207,142,0.08)] px-1.5 py-0.5 text-[#3ECF8E]">
-                    HIT
-                  </span>
-                </td>
-                <td className="py-3 text-[#7d8590]">12ms</td>
-              </tr>
-              <tr className="border-b border-white/[0.03]">
-                <td className="py-3 text-[#7d8590]">10:41:55.120Z</td>
-                <td className="py-3 text-[#3ECF8E]">org:settings:192</td>
-                <td className="py-3">
-                  <span className="rounded border border-[#f85149]/30 bg-[rgba(248,81,73,0.08)] px-1.5 py-0.5 text-[#f85149]">
-                    MISS
-                  </span>
-                </td>
-                <td className="py-3 text-[#7d8590]">84ms</td>
-              </tr>
-              <tr>
-                <td className="py-3 text-[#7d8590]">10:41:50.005Z</td>
-                <td className="py-3 text-[#3ECF8E]">query:vector:abc...</td>
-                <td className="py-3">
-                  <span className="rounded border border-[#3ECF8E]/30 bg-[rgba(62,207,142,0.08)] px-1.5 py-0.5 text-[#3ECF8E]">
-                    HIT
-                  </span>
-                </td>
-                <td className="py-3 text-[#7d8590]">8ms</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        {cacheOps.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 py-8 text-center text-[#7d8590]">
+            <Search className="h-5 w-5 opacity-40" />
+            <p className="text-xs">Run a search to see live cache operation logs here.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-white/[0.06] text-left text-xs text-[#7d8590]">
+                  <th className="pb-3 font-medium">Timestamp</th>
+                  <th className="pb-3 font-medium">Query</th>
+                  <th className="pb-3 font-medium">Action</th>
+                  <th className="pb-3 font-medium">Duration</th>
+                </tr>
+              </thead>
+              <tbody className="font-mono text-xs">
+                {cacheOps.map((op, i) => (
+                  <tr key={i} className="border-b border-white/[0.03] last:border-0">
+                    <td className="py-3 text-[#7d8590]">{op.timestamp}</td>
+                    <td className="py-3 text-foreground/80">{op.query}</td>
+                    <td className="py-3">
+                      <span
+                        className={`rounded border px-1.5 py-0.5 ${
+                          op.action === "HIT"
+                            ? "border-[#3ECF8E]/30 bg-[rgba(62,207,142,0.08)] text-[#3ECF8E]"
+                            : "border-[#f85149]/30 bg-[rgba(248,81,73,0.08)] text-[#f85149]"
+                        }`}
+                      >
+                        {op.action}
+                      </span>
+                    </td>
+                    <td className="py-3 text-[#7d8590]">{op.durationMs}ms</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </section>
   );
