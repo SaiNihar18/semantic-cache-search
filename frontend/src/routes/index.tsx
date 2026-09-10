@@ -22,6 +22,7 @@ import {
   Cpu,
   Zap,
   Info,
+  Check,
   ChevronRight,
   ExternalLink,
 } from "lucide-react";
@@ -29,6 +30,12 @@ import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 
 const API = (import.meta.env.VITE_API_URL as string) || "http://localhost:8000";
+const API_DOCS = `${API}/docs`;
+
+/** Small round separator used between inline metadata items. */
+function Dot() {
+  return <span className="inline-block h-1 w-1 shrink-0 rounded-full bg-current opacity-40" />;
+}
 
 const SUGGESTED = [
   "Space & Rockets",
@@ -150,21 +157,19 @@ const NEWSGROUP_CATEGORIES = [
   },
 ];
 
-export const Route = createFileRoute("/")(
-  {
-    head: () => ({
-      meta: [
-        { title: "SemanticCache — Intelligent Document Search" },
-        {
-          name: "description",
-          content:
-            "Fast, cluster-aware document retrieval with intelligent caching across 20,000 documents.",
-        },
-      ],
-    }),
-    component: Index,
-  },
-);
+export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: "SemanticCache - Intelligent Document Search" },
+      {
+        name: "description",
+        content:
+          "Fast, cluster-aware document retrieval with intelligent caching across 20,000 documents.",
+      },
+    ],
+  }),
+  component: Index,
+});
 
 function Index() {
   const [query, setQuery] = useState("");
@@ -236,7 +241,7 @@ function Index() {
       // Record this operation in the live cache ops table
       const op: CacheOp = {
         timestamp: new Date().toISOString().slice(11, 23) + "Z",
-        query: trimmed.length > 28 ? trimmed.slice(0, 28) + "…" : trimmed,
+        query: trimmed.length > 28 ? trimmed.slice(0, 28) + "..." : trimmed,
         action: data.cache_hit ? "HIT" : "MISS",
         durationMs: elapsed,
       };
@@ -332,12 +337,15 @@ function Index() {
       />
       <Toaster theme="dark" />
 
-      {/* ═══════ TOP NAVBAR ═══════ */}
+      {/* TOP NAVBAR */}
       <nav className="border-b border-white/[0.06] bg-[rgba(13,17,23,0.85)] backdrop-blur-lg sticky top-0 z-50">
         <div className="mx-auto flex h-14 max-w-[1200px] items-center justify-between px-5">
           <div className="flex items-center gap-6">
             <button
-              onClick={() => { setActiveNav("Explorer"); setArticle(null); }}
+              onClick={() => {
+                setActiveNav("Explorer");
+                setArticle(null);
+              }}
               className="text-base font-bold text-[#3ECF8E] hover:opacity-80 transition"
             >
               SemanticCache
@@ -359,7 +367,7 @@ function Index() {
           </div>
           <div className="flex items-center gap-3">
             <a
-              href="http://localhost:8000/docs"
+              href={API_DOCS}
               target="_blank"
               rel="noopener noreferrer"
               className="hidden text-sm text-[#7d8590] hover:text-foreground transition md:inline-flex items-center gap-1"
@@ -398,21 +406,26 @@ function Index() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
-              {/* ═══════ HERO ═══════ */}
+              {/* HERO */}
               <header className="mx-auto mb-10 max-w-[800px] text-center">
                 <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-mono text-muted-foreground">
                   <Sparkles className="h-3.5 w-3.5 text-[#3ECF8E]" />
-                  SemanticCache · 20 Newsgroups · ~20K Docs
+                  <span>SemanticCache</span>
+                  <Dot />
+                  <span>20 Newsgroups</span>
+                  <Dot />
+                  <span>20K Docs</span>
                 </div>
                 <h1 className="text-4xl font-bold leading-[1.1] tracking-tight md:text-6xl">
                   <span className="text-gradient-brand">Semantic Cache Search</span>
                 </h1>
                 <p className="mx-auto mt-4 max-w-[640px] text-base text-muted-foreground md:text-lg">
-                  Fast, cluster-aware document retrieval with intelligent caching across 20,000 newsgroup documents.
+                  Fast, cluster-aware document retrieval with intelligent caching across 20,000
+                  newsgroup documents.
                 </p>
               </header>
 
-              {/* ═══════ SEARCH CONSOLE ═══════ */}
+              {/* SEARCH CONSOLE */}
               <section className="glass-strong mb-8 rounded-2xl p-5 md:p-7">
                 {/* title bar */}
                 <div className="mb-5 flex items-center gap-2.5">
@@ -486,20 +499,20 @@ function Index() {
                   />
                   <div className="mt-2 flex justify-between font-mono text-[11px] text-[#7d8590]">
                     <span>0.70 (Broad)</span>
-                    <span>0.85 ★ Recommended</span>
+                    <span>0.85 (Recommended)</span>
                     <span>0.98 (Exact)</span>
                   </div>
                 </div>
               </section>
 
-              {/* ═══════ ERROR BANNER ═══════ */}
+              {/* ERROR BANNER */}
               {error && (
                 <div className="mb-6 rounded-xl border border-[#d29922]/40 bg-[rgba(210,153,34,0.06)] p-4 text-sm text-[#d29922] backdrop-blur">
                   {error}
                 </div>
               )}
 
-              {/* ═══════ RESULTS / SKELETON / EMPTY ═══════ */}
+              {/* RESULTS / SKELETON / EMPTY */}
               <section className="mb-12 min-h-[280px]">
                 <AnimatePresence mode="wait">
                   {loading ? (
@@ -517,13 +530,18 @@ function Index() {
                 </AnimatePresence>
               </section>
 
-              {/* ═══════ TELEMETRY ═══════ */}
+              {/* TELEMETRY */}
               <section ref={telemetryRef}>
-                <Telemetry stats={stats} onClear={clearCache} onRefresh={refreshStats} cacheOps={cacheOps} />
+                <Telemetry
+                  stats={stats}
+                  onClear={clearCache}
+                  onRefresh={refreshStats}
+                  cacheOps={cacheOps}
+                />
               </section>
 
-              {/* ═══════ FOOTER ═══════ */}
-              <Footer />
+              {/* FOOTER */}
+              <Footer online={stats !== null} />
             </motion.div>
           )}
         </AnimatePresence>
@@ -532,23 +550,16 @@ function Index() {
   );
 }
 
-/* ────────────────────────────────────────────── */
-/*  FOOTER                                         */
-/* ────────────────────────────────────────────── */
-function Footer() {
+/* Footer */
+function Footer({ online }: { online?: boolean }) {
   const year = new Date().getFullYear();
   return (
     <footer className="mt-10 border-t border-white/5 pt-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-[#3ECF8E] text-sm">SemanticCache</span>
-            <span className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-[#7d8590]">
-              v2.4.1
-            </span>
-          </div>
+          <span className="font-bold text-[#3ECF8E] text-sm">SemanticCache</span>
           <p className="font-mono text-[11px] text-[#7d8590]">
-            © {year} Built by{" "}
+            &copy; {year} Built by{" "}
             <a
               href="https://github.com/SaiNihar18"
               target="_blank"
@@ -556,8 +567,8 @@ function Footer() {
               className="text-foreground/70 hover:text-[#3ECF8E] transition"
             >
               Sai Nihar
-            </a>{" "}
-            · 20 Newsgroups · FAISS + SentenceTransformers
+            </a>
+            . 20 Newsgroups dataset, FAISS and SentenceTransformers.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-4 font-mono text-[11px] text-[#7d8590]">
@@ -570,7 +581,7 @@ function Footer() {
             <Github className="h-3 w-3" /> GitHub
           </a>
           <a
-            href="http://localhost:8000/docs"
+            href={API_DOCS}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 hover:text-foreground transition"
@@ -585,19 +596,23 @@ function Footer() {
           >
             <Database className="h-3 w-3" /> Dataset
           </a>
-          <span className="inline-flex items-center gap-1">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#3ECF8E] shadow-[0_0_6px_#3ECF8E]" />
-            Backend live
-          </span>
+          {online !== undefined && (
+            <span className="inline-flex items-center gap-1">
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${
+                  online ? "bg-[#3ECF8E] shadow-[0_0_6px_#3ECF8E]" : "bg-[#7d8590]"
+                }`}
+              />
+              {online ? "Backend online" : "Backend offline"}
+            </span>
+          )}
         </div>
       </div>
     </footer>
   );
 }
 
-/* ────────────────────────────────────────────── */
-/*  ABOUT DATA                                     */
-/* ────────────────────────────────────────────── */
+/* About Data */
 function AboutData() {
   return (
     <motion.div
@@ -627,17 +642,38 @@ function AboutData() {
           >
             20 Newsgroups dataset <ExternalLink className="h-3 w-3" />
           </a>
-          — a classic NLP benchmark containing ~20,000 newsgroup posts across 20 topic categories from the early 1990s.
+          , a classic NLP benchmark of roughly 20,000 newsgroup posts across 20 topic categories
+          from the early 1990s.
         </p>
       </div>
 
       {/* Stats row */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          { label: "Total Documents", value: "~20,000", icon: <Database className="h-4 w-4" />, color: "#3ECF8E" },
-          { label: "Topic Categories", value: "20", icon: <Layers className="h-4 w-4" />, color: "#B795FF" },
-          { label: "Embedding Dims", value: "384", icon: <Cpu className="h-4 w-4" />, color: "#F4BD50" },
-          { label: "GMM Clusters", value: "20", icon: <Zap className="h-4 w-4" />, color: "#f85149" },
+          {
+            label: "Total Documents",
+            value: "~20,000",
+            icon: <Database className="h-4 w-4" />,
+            color: "#3ECF8E",
+          },
+          {
+            label: "Topic Categories",
+            value: "20",
+            icon: <Layers className="h-4 w-4" />,
+            color: "#B795FF",
+          },
+          {
+            label: "Embedding Dims",
+            value: "384",
+            icon: <Cpu className="h-4 w-4" />,
+            color: "#F4BD50",
+          },
+          {
+            label: "GMM Clusters",
+            value: "20",
+            icon: <Zap className="h-4 w-4" />,
+            color: "#f85149",
+          },
         ].map((s) => (
           <div key={s.label} className="glass rounded-xl p-4">
             <div className="mb-1 flex items-center gap-2 text-sm text-[#7d8590]">
@@ -715,7 +751,7 @@ function AboutData() {
               title: "Cache Lookup",
               color: "#F4BD50",
               icon: <Zap className="h-5 w-5" />,
-              desc: "The cache is searched within the predicted cluster. If cosine similarity ≥ threshold → Cache HIT.",
+              desc: "The cache is searched within the predicted cluster. If cosine similarity meets the threshold, it counts as a cache hit.",
             },
             {
               step: "4",
@@ -725,11 +761,12 @@ function AboutData() {
               desc: "On a cache miss, FAISS performs exact inner-product search over all ~20K document embeddings.",
             },
           ].map((s, i) => (
-            <div key={s.step} className="relative rounded-xl border border-[#30363d] bg-[#0d1117]/50 p-4">
+            <div
+              key={s.step}
+              className="relative rounded-xl border border-[#30363d] bg-[#0d1117]/50 p-4"
+            >
               {i < 3 && (
-                <ChevronRight
-                  className="absolute -right-3 top-1/2 z-10 hidden h-4 w-4 -translate-y-1/2 text-[#30363d] lg:block"
-                />
+                <ChevronRight className="absolute -right-3 top-1/2 z-10 hidden h-4 w-4 -translate-y-1/2 text-[#30363d] lg:block" />
               )}
               <div
                 className="mb-3 inline-grid h-9 w-9 place-items-center rounded-lg"
@@ -737,7 +774,10 @@ function AboutData() {
               >
                 {s.icon}
               </div>
-              <div className="mb-1 font-mono text-[10px] uppercase tracking-widest" style={{ color: s.color }}>
+              <div
+                className="mb-1 font-mono text-[10px] uppercase tracking-widest"
+                style={{ color: s.color }}
+              >
                 Step {s.step}
               </div>
               <div className="mb-2 font-bold">{s.title}</div>
@@ -755,13 +795,34 @@ function AboutData() {
           </h2>
           <div className="space-y-3">
             {[
-              { label: "Embedding Model", value: "all-MiniLM-L6-v2", sub: "22M parameters · Fast CPU inference" },
-              { label: "Vector Index", value: "FAISS IndexFlatIP", sub: "Exact inner-product search" },
-              { label: "Clustering", value: "Gaussian Mixture Model", sub: "20 components · Soft assignment" },
-              { label: "Normalization", value: "L2 Normalized", sub: "Cosine similarity via inner product" },
+              {
+                label: "Embedding Model",
+                value: "all-MiniLM-L6-v2",
+                sub: "22M parameters, fast CPU inference",
+              },
+              {
+                label: "Vector Index",
+                value: "FAISS IndexFlatIP",
+                sub: "Exact inner-product search",
+              },
+              {
+                label: "Clustering",
+                value: "Gaussian Mixture Model",
+                sub: "20 components, soft assignment",
+              },
+              {
+                label: "Normalization",
+                value: "L2 Normalized",
+                sub: "Cosine similarity via inner product",
+              },
             ].map((row) => (
-              <div key={row.label} className="rounded-lg border border-[#30363d] bg-[#0d1117]/50 p-3">
-                <div className="mb-0.5 text-[11px] uppercase tracking-widest text-[#7d8590]">{row.label}</div>
+              <div
+                key={row.label}
+                className="rounded-lg border border-[#30363d] bg-[#0d1117]/50 p-3"
+              >
+                <div className="mb-0.5 text-[11px] uppercase tracking-widest text-[#7d8590]">
+                  {row.label}
+                </div>
                 <div className="font-mono text-sm font-semibold text-[#3ECF8E]">{row.value}</div>
                 <div className="text-[11px] text-[#7d8590]">{row.sub}</div>
               </div>
@@ -774,13 +835,29 @@ function AboutData() {
             <SlidersHorizontal className="h-5 w-5 text-[#B795FF]" /> Threshold Guide
           </h2>
           <p className="mb-4 text-sm text-[#7d8590]">
-            The similarity threshold controls how strictly a cached result must match your new query before being served from cache.
+            The similarity threshold controls how strictly a cached result must match your new query
+            before being served from cache.
           </p>
           <div className="space-y-3">
             {[
-              { val: "0.70", label: "Broad", color: "#F4BD50", desc: "High cache hit rate. Good when approximate answers are acceptable." },
-              { val: "0.85", label: "★ Recommended", color: "#3ECF8E", desc: "Balanced precision & recall. Best for general production use." },
-              { val: "0.95 – 0.98", label: "Exact", color: "#f85149", desc: "Strict matching. Low hit rate. Use when exact semantic equivalence is critical." },
+              {
+                val: "0.70",
+                label: "Broad",
+                color: "#F4BD50",
+                desc: "High cache hit rate. Good when approximate answers are acceptable.",
+              },
+              {
+                val: "0.85",
+                label: "Recommended",
+                color: "#3ECF8E",
+                desc: "Balanced precision and recall. Best for general production use.",
+              },
+              {
+                val: "0.95 to 0.98",
+                label: "Exact",
+                color: "#f85149",
+                desc: "Strict matching. Low hit rate. Use when exact semantic equivalence is critical.",
+              },
             ].map((t) => (
               <div
                 key={t.val}
@@ -788,8 +865,12 @@ function AboutData() {
                 style={{ borderColor: `${t.color}33`, background: `${t.color}0a` }}
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="font-mono text-sm font-bold" style={{ color: t.color }}>{t.val}</span>
-                  <span className="text-xs font-semibold" style={{ color: t.color }}>{t.label}</span>
+                  <span className="font-mono text-sm font-bold" style={{ color: t.color }}>
+                    {t.val}
+                  </span>
+                  <span className="text-xs font-semibold" style={{ color: t.color }}>
+                    {t.label}
+                  </span>
                 </div>
                 <p className="text-[12px] text-[#7d8590]">{t.desc}</p>
               </div>
@@ -803,9 +884,7 @@ function AboutData() {
   );
 }
 
-/* ────────────────────────────────────────────── */
-/*  EMPTY STATE                                    */
-/* ────────────────────────────────────────────── */
+/* Empty State */
 function EmptyState() {
   return (
     <motion.div
@@ -818,14 +897,14 @@ function EmptyState() {
         <Search className="h-6 w-6" />
       </div>
       <p className="text-sm">Enter a query to search across 20,000 newsgroup documents</p>
-      <p className="text-xs text-[#484f58]">Try: "Space & Rockets", "Computer Hardware", or "Medicine"</p>
+      <p className="text-xs text-[#484f58]">
+        Try: "Space & Rockets", "Computer Hardware", or "Medicine"
+      </p>
     </motion.div>
   );
 }
 
-/* ────────────────────────────────────────────── */
-/*  SKELETON LOADING                               */
-/* ────────────────────────────────────────────── */
+/* Skeleton Loading */
 function SkeletonResults() {
   return (
     <motion.div
@@ -854,9 +933,7 @@ function SkeletonResults() {
   );
 }
 
-/* ────────────────────────────────────────────── */
-/*  RESULTS VIEW                                   */
-/* ────────────────────────────────────────────── */
+/* Results View */
 function ResultsView({
   response,
   onOpen,
@@ -895,23 +972,23 @@ function ResultsView({
               </span>
               <span className="shrink-0 font-mono text-sm text-[#7d8590] flex items-center gap-1">
                 Score{" "}
-                <span className="font-bold text-[#3ECF8E]">
-                  {r.similarity_score.toFixed(2)}
-                </span>
+                <span className="font-bold text-[#3ECF8E]">{r.similarity_score.toFixed(2)}</span>
                 <span className="group/tooltip relative">
                   <Info className="h-3.5 w-3.5 text-[#7d8590] hover:text-foreground cursor-help" />
                   <span className="pointer-events-none absolute right-0 bottom-full mb-2 w-64 rounded-lg border border-[#30363d] bg-[#0d1117] p-2.5 text-xs font-sans leading-relaxed text-[#7d8590] opacity-0 shadow-2xl transition-opacity group-hover/tooltip:opacity-100 z-30 normal-case font-normal">
-                    <strong className="text-foreground block mb-1">Document Similarity Score</strong>
-                    Calculated using cosine similarity. Short query vectors matched against long document vectors naturally yield scores of 0.45–0.70 due to length and context dilution.
+                    <strong className="text-foreground block mb-1">
+                      Document Similarity Score
+                    </strong>
+                    Calculated using cosine similarity. Short query vectors matched against long
+                    document vectors naturally yield scores of 0.45 to 0.70 due to length and
+                    context dilution.
                   </span>
                 </span>
               </span>
             </div>
 
             {/* document title */}
-            <h3 className="mb-2 text-xl font-bold tracking-tight">
-              Document #{r.doc_id}
-            </h3>
+            <h3 className="mb-2 text-xl font-bold tracking-tight">Document #{r.doc_id}</h3>
 
             {/* text snippet */}
             <p
@@ -930,7 +1007,9 @@ function ResultsView({
             <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-3">
               <span className="inline-flex items-center gap-1.5 font-mono text-xs text-[#7d8590]">
                 <Database className="h-3.5 w-3.5" />
-                Doc #{r.doc_id} &middot; Cluster {r.dominant_cluster}
+                <span>Doc #{r.doc_id}</span>
+                <Dot />
+                <span>Cluster {r.dominant_cluster}</span>
               </span>
               <span className="inline-flex items-center gap-1 text-sm font-semibold text-[#3ECF8E] transition group-hover:gap-2">
                 Read Full Article <ArrowRight className="h-3.5 w-3.5" />
@@ -943,9 +1022,7 @@ function ResultsView({
   );
 }
 
-/* ────────────────────────────────────────────── */
-/*  CACHE BANNER                                   */
-/* ────────────────────────────────────────────── */
+/* Cache Banner */
 function CacheBanner({
   response,
   responseTimeMs,
@@ -1003,7 +1080,9 @@ function CacheBanner({
               )}
             </div>
           ) : (
-            <span className="text-sm text-[#7d8590]">Performing vector search across 20K documents…</span>
+            <span className="text-sm text-[#7d8590]">
+              Performing vector search across 20K documents...
+            </span>
           )}
         </div>
 
@@ -1017,18 +1096,18 @@ function CacheBanner({
         >
           {hit ? (
             <span className="group/cache-tooltip relative flex items-center gap-1">
-              Similarity{" "}
-              <span className="ml-1">{(response.similarity_score ?? 0).toFixed(2)}</span>
+              Similarity <span className="ml-1">{(response.similarity_score ?? 0).toFixed(2)}</span>
               <Info className="h-3.5 w-3.5 text-[#3ECF8E]/80 hover:text-[#3ECF8E] cursor-help" />
               <span className="pointer-events-none absolute right-0 bottom-full mb-2 w-64 rounded-lg border border-[#3ECF8E]/30 bg-[#0d1117] p-2.5 text-xs font-sans leading-relaxed text-[#7d8590] opacity-0 shadow-2xl transition-opacity group-hover/cache-tooltip:opacity-100 z-30 normal-case font-normal">
                 <strong className="text-foreground block mb-1">Query-to-Query Similarity</strong>
-                Cosine similarity between this search and a previous search. Because both are short queries, exact or close semantic matches naturally score high (&ge; 0.85).
+                Cosine similarity between this search and a previous search. Because both are short
+                queries, exact or close semantic matches naturally score high (0.85 or above).
               </span>
             </span>
           ) : (
             <span className="inline-flex items-center gap-1">
               <Timer className="h-3 w-3" />
-              {responseTimeMs ?? "—"}ms
+              {responseTimeMs ?? 0}ms
             </span>
           )}
         </div>
@@ -1037,9 +1116,7 @@ function CacheBanner({
   );
 }
 
-/* ────────────────────────────────────────────── */
-/*  ARTICLE VIEW                                   */
-/* ────────────────────────────────────────────── */
+/* Article View */
 function ArticleView({
   article,
   loading,
@@ -1162,7 +1239,7 @@ function ArticleView({
             </div>
             <div className="font-mono text-base font-semibold">{article.category}</div>
             <div className="mt-1.5 inline-flex items-center gap-1 text-xs text-[#3ECF8E]">
-              <span className="text-[#3ECF8E]">&#10003;</span> High Confidence
+              <Check className="h-3.5 w-3.5" /> High Confidence
             </div>
           </div>
 
@@ -1175,12 +1252,10 @@ function ArticleView({
               <span className="h-2.5 w-2.5 rounded-full bg-[#3ECF8E]" />
               Cluster {article.dominant_cluster}
             </div>
-            <div className="mt-1.5 font-mono text-[11px] text-[#7d8590]">
-              GMM Soft Assignment
-            </div>
+            <div className="mt-1.5 font-mono text-[11px] text-[#7d8590]">GMM Soft Assignment</div>
           </div>
 
-          {/* export button — now functional */}
+          {/* export button */}
           <button
             onClick={handleExport}
             disabled={loading}
@@ -1195,9 +1270,7 @@ function ArticleView({
   );
 }
 
-/* ────────────────────────────────────────────── */
-/*  COUNT-UP HOOK                                  */
-/* ────────────────────────────────────────────── */
+/* Count-Up Hook */
 function useCountUp(value: number, duration = 600) {
   const [n, setN] = useState(value);
   const fromRef = useRef(value);
@@ -1218,9 +1291,7 @@ function useCountUp(value: number, duration = 600) {
   return n;
 }
 
-/* ────────────────────────────────────────────── */
-/*  TELEMETRY                                      */
-/* ────────────────────────────────────────────── */
+/* Telemetry */
 function Telemetry({
   stats,
   onClear,
@@ -1264,16 +1335,14 @@ function Telemetry({
       </div>
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
-        {/* ── Hit Rate ── */}
+        {/* Hit Rate */}
         <div className="glass rounded-xl p-4">
           <div className="mb-2 flex items-center justify-between text-sm text-[#7d8590]">
             Hit Rate <BarChart3 className="h-4 w-4" />
           </div>
           <div className="flex items-center justify-between">
             <div className="flex items-baseline gap-0.5">
-              <span className="text-3xl font-bold tracking-tight">
-                {Math.round(hitRate)}
-              </span>
+              <span className="text-3xl font-bold tracking-tight">{Math.round(hitRate)}</span>
               <span className="text-lg text-[#7d8590]">%</span>
             </div>
             <svg width="52" height="52" viewBox="0 0 52 52" className="-rotate-90">
@@ -1299,25 +1368,24 @@ function Telemetry({
               />
             </svg>
           </div>
-          <div className="mt-3 font-mono text-[11px] text-[#3ECF8E]">
-            &uarr; live
+          <div className="mt-3 inline-flex items-center gap-1.5 font-mono text-[11px] text-[#3ECF8E]">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#3ECF8E] shadow-[0_0_6px_#3ECF8E]" />
+            live
           </div>
         </div>
 
-        {/* ── Cache Entries ── */}
+        {/* Cache Entries */}
         <div className="glass rounded-xl p-4">
           <div className="mb-2 flex items-center justify-between text-sm text-[#7d8590]">
             Cache Entries <ListChecks className="h-4 w-4" />
           </div>
           <div className="flex items-baseline gap-0.5">
-            <span className="text-3xl font-bold tracking-tight">
-              {Math.round(entries)}
-            </span>
+            <span className="text-3xl font-bold tracking-tight">{Math.round(entries)}</span>
           </div>
           <div className="mt-3 text-xs text-[#7d8590]">Total active items stored</div>
         </div>
 
-        {/* ── Hits / Misses ── */}
+        {/* Hits / Misses */}
         <div className="glass rounded-xl p-4">
           <div className="mb-2 flex items-center justify-between text-sm text-[#7d8590]">
             Hits / Misses <ArrowLeftRight className="h-4 w-4" />
@@ -1335,7 +1403,7 @@ function Telemetry({
           </div>
         </div>
 
-        {/* ── Clear Cache ── */}
+        {/* Clear Cache */}
         <button
           onClick={onClear}
           className="group rounded-xl border border-[#f85149]/25 bg-[rgba(248,81,73,0.04)] p-4 text-left transition hover:border-[#f85149]/50 hover:bg-[rgba(248,81,73,0.08)]"
@@ -1347,12 +1415,14 @@ function Telemetry({
         </button>
       </div>
 
-      {/* ── Live Cache Operations Table ── */}
+      {/* Live Cache Operations Table */}
       <div className="glass mt-4 rounded-xl p-5">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-base font-semibold">Recent Cache Operations</h3>
           <span className="font-mono text-[11px] text-[#7d8590]">
-            {cacheOps.length === 0 ? "No queries yet this session" : `${cacheOps.length} operation${cacheOps.length !== 1 ? "s" : ""}`}
+            {cacheOps.length === 0
+              ? "No queries yet this session"
+              : `${cacheOps.length} operation${cacheOps.length !== 1 ? "s" : ""}`}
           </span>
         </div>
         {cacheOps.length === 0 ? (
