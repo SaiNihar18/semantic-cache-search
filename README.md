@@ -24,7 +24,7 @@ Traditional keyword search fails when queries use different words to express the
 - **Intelligent caching**: Remembers previous queries and recognizes paraphrased versions, dramatically reducing computation time
 - **Fast retrieval**: Uses FAISS for sub-millisecond vector similarity searches across 20,000 documents
 
-**Example:** Both *"How do rockets work?"* and *"Explain rocket propulsion"* will retrieve the same cached result because they share semantic similarity above the 0.85 threshold.
+**Example:** Both *"How do rockets work?"* and *"How does a rocket work?"* retrieve the same cached result because their similarity (about 0.93) is above the 0.85 threshold.
 
 ---
 

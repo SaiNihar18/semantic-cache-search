@@ -51,7 +51,7 @@ cluster_model = ClusterPredictor()
 
 class QueryRequest(BaseModel):
 
-    query: str
+    query: str = Field(..., min_length=1, max_length=500)
     similarity_threshold: Optional[float] = Field(
         default=None,
         ge=0.70,
@@ -69,7 +69,10 @@ def query_api(request: QueryRequest):
 
     global hit_count, miss_count
 
-    query = request.query
+    query = request.query.strip()
+
+    if not query:
+        raise HTTPException(status_code=422, detail="Query must not be empty")
 
     query_embedding = embedding_model.embed(query)
 
@@ -118,6 +121,11 @@ def query_api(request: QueryRequest):
         "results": results_list,
         "dominant_cluster": cluster_id
     }
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
 
 @app.get("/cache/stats")

@@ -4,7 +4,7 @@ from collections import defaultdict
 
 class SemanticCache:
 
-    def __init__(self, similarity_threshold=0.85):
+    def __init__(self, similarity_threshold=0.85, max_entries=2000):
 
         # We structure the cache as a dictionary of lists grouped by cluster_id.
         # This "cluster-aware caching" restricts the search domain. Instead of 
@@ -16,6 +16,9 @@ class SemanticCache:
         # different concepts. We use 0.85 as a balanced sweet spot (as values too low
         # like 0.70 trigger false positives, while 0.95 acts almost like an exact string match).
         self.similarity_threshold = similarity_threshold
+
+        # Cap total entries so memory stays bounded on small hosts (oldest evicted first).
+        self.max_entries = max_entries
 
 
     def lookup(self, query_embedding, cluster_id, threshold=None):
@@ -64,6 +67,19 @@ class SemanticCache:
         }
 
         self.cache[cluster_id].append(entry)
+
+        self._evict_if_needed()
+
+
+    def _evict_if_needed(self):
+
+        total = sum(len(v) for v in self.cache.values())
+
+        while total > self.max_entries:
+            # Drop the first entry of the largest bucket (approximate FIFO)
+            biggest = max(self.cache, key=lambda k: len(self.cache[k]))
+            self.cache[biggest].pop(0)
+            total -= 1
 
 
     def stats(self):
